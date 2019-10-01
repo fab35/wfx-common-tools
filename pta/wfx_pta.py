@@ -12,12 +12,20 @@
 
 # Use wfx_pta_data to prepare PTA bytes from input parameters
 # then send them to the target
-#
+
+# TODO:
+# * Check int vs str + Add robust str processing (remove case-sensitive in wfx_pta_data?)
+# * Check ActiveLevel effect in wfx_pta_data
+# * Extend the list of possible values for priority: Add 0xYYYY capability
+# * Clean the code (and remove debug / comments...)
+# * Note: 
+#   (1) settings must be defined BEFORE activating PTA (i.e. order: wfx_driver_reload -> settings -> state ON)
+#   (2) potential shell script to simplify call + properly set envt/paths (ex: call from anywhere a simple "wfx_pta_state ON")
 
 from __future__ import print_function
 
 # If you modify this file, please don't forget to increment version number.
-__version__ = "0.1"
+__version__ = "0.1.1"
 
 import sys
 import time
@@ -42,8 +50,7 @@ class WfxPtaTarget(object):
         self.pta_data = None
         self.pta_mode = 'quiet'
         self.link = None
-        # TODO: Add connect={True,False} option, with default=True
-
+        # Added connect={True,False} option (rather redundant verif), with default=True or False?
         if 'connect' in kwargs:
             self.connect = True #kwargs['connect']
         else:
@@ -139,8 +146,8 @@ class WfxPtaTarget(object):
 
 if __name__ == '__main__':
 
-    if MAIN_TEST_MODE==1:
-        print('You\'re using a ', sys.platform, 'platform')
+    if MAIN_TEST_MODE == 1:
+        print('Main Test: You are using a ', sys.platform, 'platform')
         print(wfx_cnx.uarts())
         print(wfx_cnx.networks())
 
@@ -161,52 +168,65 @@ if __name__ == '__main__':
         print(dut.priority('--PriorityMode BALANCED'))
         print(dut.state('--State OFF'))
 
-    else:
+    elif MAIN_TEST_MODE == 2:
+        print('Main CommandLine: You are using a ', sys.platform, 'platform')
+        dut = WfxPtaTarget('Local')
+        if 'verbose' in sys.argv:
+            dut.trace = True
+            dut.link.trace = True
+            sys.argv.remove('verbose')
+            mode = 'verbose'
+        else:
+            mode = 'quiet'
+        sys.exit(dut.send_pta(sys.argv[1], ' '.join(sys.argv[2:]), mode))
+
+    else: #MAIN_TEST_MODE == 0
       def parse_cmdline_(args=sys.argv[1:]):
         # Potential preprocessing of args  
 
         # Define parser
         parser = argparse.ArgumentParser(description="""Generates a Bytes-frame that can be sent to HIF to configure PTA options. \r\n\
-            Optionally calls the wfx_exec(HIF) to send this stream on the current device.  \r\n\
-            Use cases: \r\n \
-             * %(prog)s state {ON,OFF}.                                                . \r\n \
-             * %(prog)s priority {COEX_MAXIMIZED,COEX_HIGH,BALANCED,WLAN_HIGH,WLAN_MAXIMIZED,0xYYYY} where YYYY is an hexa value.                 . \r\n \
-             * %(prog)s settings {3W_NOT_COMBINED_BLE,3W_COMBINED_BLE,3W_NOT_COMBINED_ZIGBEE,3W_COMBINED_ZIGBEE} [options], w/ options described appending --help... """) #usage="%(prog)s [command [options]]"), prefix_chars='-', allow_abbrev=False
+          Optionally calls the wfx_exec(HIF) to send this stream on the current device.  \r\n\
+          Use cases: \r\n \
+           * %(prog)s state {ON,OFF}.                                                . \r\n \
+           * %(prog)s priority {COEX_MAXIMIZED,COEX_HIGH,BALANCED,WLAN_HIGH,WLAN_MAXIMIZED,0xYYYY} where YYYY is an hexa value.                 . \r\n \
+           * %(prog)s settings {3W_BLE,3W_NOT_COMBINED_ZIGBEE,3W_COMBINED_ZIGBEE} [options], w/ options described appending --help. """) 
+           #usage="%(prog)s [command [options]]"), prefix_chars='-', allow_abbrev=False
         # Parser arguments: Optional
-        parser.add_argument('--version',        action='version',   version='%(prog)s {version}'.format(version=__version__))
-        #parser.add_argument('--send',           action='target_send', default=1)
+        parser.add_argument('--version',       action='version',   version='%(prog)s {version}'.format(version=__version__))
+        parser.add_argument("-m",              dest="mode", default="QUIET", choices=['QUIET','VERBOSE'], help="Specify output mode (debug display): QUIET or VERBOSE") #"--mode"
+        parser.add_argument("-v", "--verbose", dest="mode", action="store_const", const="VERBOSE", help="Shortcut for --mode=VERBOSE")
+        parser.add_argument("-x",              dest="exeh", action="store_true", help="Flag to run the command on the current device, using wfx_exec")
         #parser.add_argument("-S", "--settings", dest="cmd", action='append',            help="xxx")
         #parser.add_argument("-O", "--state",    dest="cmd", action='append',    choices=['ON', 'OFF'],  help="PTA State ON or OFF xxx")
         #parser.add_argument("-P", "--priority", dest="cmd", action='append', choices=['x', 'y'],    help="xxx")
-        #parser.add_argument("-m", "--mode",     dest="mode",  default="quiet", choices=['quiet','verbose'], help="specify output mode (debug display): quiet or verbose")
-        parser.add_argument("-m",               dest="mode",  default="QUIET", choices=['QUIET','VERBOSE'], help="specify output mode (debug display): QUIET or VERBOSE")
-        parser.add_argument("-v", "--verbose",  dest="mode",  action="store_const", const="VERBOSE", help="shortcut for --mode=VERBOSE")
-        parser.add_argument("-x",               dest="exeh",  action="store_true", help="Flag to run the command on the current device, using wfx_exec")
-        #parser.add_argument("-q", "--quiet",    dest="mode",  action="store_const", const="quiet",  help="shortcut for --mode=quiet")
         # Parser arguments: Mandatory
-        parser.add_argument("command", action='store', metavar="command", choices=['STATE','PRIORITY','SETTINGS'], type=str.upper, help="command among {STATE,PRIORITY,SETTINGS}") # ARGUMENT1 ,action="append", 
+        parser.add_argument("command", action='store', metavar="command", choices=['STATE','PRIORITY','SETTINGS'], type=str.upper, help="Command among {STATE,PRIORITY,SETTINGS}") # ARGUMENT1 ,action="append", 
         #parser.add_argument("value",   action='store', nargs='+') # ARGUMENT2 ,action="append", nargs=argparse.REMAINDER
-        parser.add_argument("value",   action='store', type=str.upper, help="value depending on the command")             # ARGUMENT3
+        parser.add_argument("value",   action='store', type=str.upper, help="Value depending on the command")             # ARGUMENT3
         #parser.add_argument("options", action='store', type=str.upper, nargs='*', help="optional arguments for the settings command: ...")  # ARGUMENT4... ,action="append", nargs=argparse.REMAINDER
-        parser.add_argument("options", action='store', type=str, nargs=argparse.REMAINDER, help="optional arguments for the settings command: ...")  # ARGUMENT4... ,action="append", nargs=argparse.REMAINDER
+        parser.add_argument("options", action='store', type=str, nargs=argparse.REMAINDER, help="Optional arguments for the settings command: ...")  # ARGUMENT4... ,action="append", nargs=argparse.REMAINDER
         # Apply Parser
-        ret_args = parser.parse_args(args) #, namespace=apta #.upper()
-        #print(apta)
+        ret_args = parser.parse_args(args) #, namespace=apta #.upper() #print(apta)
         return ret_args #vars(ret_args)
 
       def main(argp):
+        res2 = None
+        restxt = ""
+        status = 0  
         mode = argp["mode"] #argp.mode
-        if mode=="VERBOSE": print("argp =",argp)
+        if mode == "VERBOSE": print("argp =",argp)
         if DEBUG_FP: print("(2) mode =",mode)
         pta  = WfxPtaData(mode) #pta  = WfxPtaData() #
         #cmd  = argp.cmd if argp.cmd else "" #"state"
-        cmd  = argp["command"] if argp["command"] else "" #"state"
+        cmd  = argp["command"] if argp["command"] else "" 
         if DEBUG_FP: print("(2) cmd  =",cmd)
-        if   cmd.upper()=="STATE":    header='state --State '
-        elif cmd.upper()=="PRIORITY": header='priority --PriorityMode '
-        elif cmd.upper()=="SETTINGS": header='settings --Config '
+        # You can define your simplification mapping here if there are mandatory+redundant arguments...
+        if   cmd.upper() == "STATE":    header='state --State '
+        elif cmd.upper() == "PRIORITY": header='priority --PriorityMode '
+        elif cmd.upper() == "SETTINGS": header='settings --Config '
         else :                        header=''
-        value   = argp["value"]   if argp["value"]   else "" 
+        value   = argp["value"]   if argp["value"]   else "" # or "_" if we want the list of possible values 
         options = argp["options"] if argp["options"] else "" 
         #args_text = header + ''.join(str(cmd)) # options #
         args_text = header + ''.join(str(value)) #.join(str(options)) # options #
@@ -227,17 +247,46 @@ if __name__ == '__main__':
         if args_alls: pta.set_args(args_alls)
         # else: #TODO
         pta_data = pta.data()
-        #print("output data bytes='%s'" % str(pta_data))
-        exeh = argp["exeh"] 
+        #if DEBUG_FP: print("(2) output data bytes='%s'" % str(pta_data))
         if DEBUG_FP: print("(2) args_alls =",args_alls)
+        # Optional execution through HIF ("-x" option)
+        exeh = argp["exeh"] 
         if exeh: 
-          import os
-          if mode=="VERBOSE": print("Sending the frame to HIF...")
-          # TODO: ensure local exec OK!
-          #send_result = subprocess.run(r'wfx_exec wfx_hif_send_msg "' + self.pta_data + r'"')
-          send_result = os.system(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"')
-          # TODO: post-process the returned send_result...
-        return pta_data
+          import subprocess #import os
+          if (mode == "VERBOSE"): 
+              #print("Data = "+str(pta_data))      
+              print("Sending the frame to the device (-x) ...")
+          send_result = None #send_result = os.system(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"')
+          try: # depending on versions of Python and Libs...
+            #send_result = subprocess.call(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"', shell=True, timeout=15) # or Popen(shlex.split(cmd...))
+            send_result = subprocess.run(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"', shell=True, timeout=15, capture_output=True) # or Popen(shlex.split(cmd...))
+            # TODO: Check there are no pb of returned value != displayed from wfx_exec 
+            # TODO: ensure local exec OK + post-process the returned send_result... + try/catch exceptions
+            #res1  = send_result.returncode
+            res2  = int(str(send_result.stdout.decode('ascii'))) #'utf-8'
+            restxt = str(res2)
+            #if (mode == "VERBOSE"): print(restxt)
+            if res2 < 0:
+              print("Execution was terminated by signal", -res2, file=sys.stderr)
+            else:
+              pass #if (mode == "VERBOSE"): print("Execution returned", res2, file=sys.stderr)
+          #except TimeoutExpired as e: #TODO
+          except OSError as e:
+              print("Execution failed:", e, file=sys.stderr)    
+          except Exception as e: #TODO         
+              print("Execution exception:", e, file=sys.stderr)       
+          if   restxt == HI_STATUS_SUCCESS:           status = 'HI_STATUS_SUCCESS (0)' # +str(pta_data)
+          elif restxt == HI_STATUS_FAILURE:           status = 'HI_STATUS_FAILURE (1)'
+          elif restxt == HI_INVALID_PARAMETER:        status = 'HI_INVALID_PARAMETER (2)'
+          elif restxt == HI_ERROR_UNSUPPORTED_MSG_ID: status = 'HI_ERROR_UNSUPPORTED_MSG_ID (4)'
+          else:                                       status = 'Unknown_error_sending PTA data: ' + str(send_result) + ' (' + str(type(send_result)) + ')'
+          if (mode == "VERBOSE") or (restxt != HI_STATUS_SUCCESS): 
+              print("Sent = " + str(pta_data))
+              print("Status = " + str(status))
+        else: 
+            if (mode == "VERBOSE"): print("No signal sent.")
+            print("Data = "+str(pta_data))      
+        return res2 #status #pta_data
 
       if 1: #__name__ == '__main__':
         if sys.version_info < (3, 0):
