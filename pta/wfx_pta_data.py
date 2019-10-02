@@ -12,8 +12,7 @@
 
 # Generate PTA bytes from input parameters
 
-# TODO: Solve str vs int mapping in settings arguments
-# TODO: Check default values + SignalActiveLevel effects (not mapped?)
+# TODO: Check default values 
 # TODO: Add priority options (e.g. to set manually COEX_PRIO_HIGH and COEX_PRIO_LOW, ...)
 # TODO: Clean once validated
 
@@ -33,30 +32,6 @@ class PtaSettings(object):
 
 
 class WfxPtaData(object):
-
-    # HI_PTA_1W_WLAN_MASTER = 0
-    # HI_PTA_1W_COEX_MASTER = 1
-    # HI_PTA_2W = 2
-    # HI_PTA_3W = 3
-    # HI_PTA_4W = 4
-
-    # HI_PTA_LOW = 0
-    # HI_PTA_HIGH = 1
-
-    # HI_COEX_TYPE_GENERIC = 0
-    # HI_COEX_TYPE_BLE = 1
-
-    # HI_PTA_NO_GRANT = 0
-    # HI_PTA_GRANT = 1
-
-    # HI_PTA_FALSE = 0
-    # HI_PTA_TRUE = 1
-
-    # HI_PTA_PRIORITY_COEX_MAXIMIZED = 0x00000562
-    # HI_PTA_PRIORITY_COEX_HIGH = 0x00000462
-    # HI_PTA_PRIORITY_BALANCED = 0x00001461
-    # HI_PTA_PRIORITY_WLAN_HIGH = 0x00001851
-    # HI_PTA_PRIORITY_WLAN_MAXIMIZED = 0x00001A51
 
     settings_parameters = [
         #  Parameter, type, bytes, choices, default, help
@@ -111,7 +86,7 @@ class WfxPtaData(object):
     state_parameters = [
         #  Parameter, type, bytes,  choices, default, help
         ('State', str, 4, {'OFF': 0, 'ON': 1}, None, """
-            PTA state on/off""")  # 'OFF' while not explicitely called using wfx_exec ... pta state ON
+            PTA state on/off""")  # default in FW: 'OFF' while not explicitely called using wfx_exec ... pta state ON
     ]
 
     def __init__(self, mode=None, **kwargs):
@@ -138,15 +113,6 @@ class WfxPtaData(object):
         # self.print_if_verbose(user_options)
         self.apply_options(self, user_options)
         return self.pta_bytes()
-
-    @staticmethod # unused
-    def print_keys(self, c, name=None):
-        for k in c.__dict__.keys():
-            if '__' not in k:
-                if name is None:
-                    self.print_if_verbose("%-30s %s" % (k, c.__dict__[k]))
-                else:
-                    self.print_if_verbose("%s.%-30s %s" % (name, k, c.__dict__[k]))
 
     @staticmethod
     def parse_cmdline(self, args):

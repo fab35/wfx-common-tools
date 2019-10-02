@@ -8,14 +8,12 @@
 #
 # Copyright (c) 2019, Silicon Laboratories
 # See license terms contained in COPYING file
-#
 
 # Use wfx_pta_data to prepare PTA bytes from input parameters
 # then send them to the target
 
 # TODO:
 # * Check int vs str + Add robust str processing (remove case-sensitive in wfx_pta_data?)
-# * Check ActiveLevel effect in wfx_pta_data
 # * Extend the list of possible values for priority: Add 0xYYYY capability
 # * Clean the code (and remove debug / comments...)
 # * Note: 
@@ -32,7 +30,6 @@ import time
 from wfx_pta_data import *
 
 MAIN_TEST_MODE = not (__name__ == '__main__') #0
-DEBUG_FP = 0
 
 if MAIN_TEST_MODE>0:
   sys.path.append('../connection')
@@ -166,8 +163,8 @@ if __name__ == '__main__':
         print(dut.run('uname -a'))
         dut.link.trace = True
 
-        print(dut.settings('--Config 3W_NOT_COMBINED_BLE'))
-        print(dut.settings('--Config 3W_NOT_COMBINED_BLE --FirstSlotTime 123', mode='verbose'))
+        print(dut.settings('--Config 3W_BLE'))
+        print(dut.settings('--Config 3W_BLE --FirstSlotTime 123', mode='verbose'))
         print(dut.priority('--PriorityMode BALANCED'))
         print(dut.state('--State OFF'))
 
@@ -186,7 +183,6 @@ if __name__ == '__main__':
     else: #MAIN_TEST_MODE == 0
       def parse_cmdline_(args=sys.argv[1:]):
         # Potential preprocessing of args  
-
         # Define parser
         parser = argparse.ArgumentParser(description="""
     Generates a Bytes-frame that can be sent to HIF to configure PTA options. 
@@ -205,18 +201,13 @@ if __name__ == '__main__':
         parser.add_argument("-m",              dest="mode", default="QUIET", choices=['QUIET','VERBOSE'], help="Specify output mode (debug display): QUIET or VERBOSE") #"--mode"
         parser.add_argument("-v", "--verbose", dest="mode", action="store_const", const="VERBOSE", help="Shortcut for --mode=VERBOSE")
         parser.add_argument("-x",              dest="exeh", action="store_true", help="Flag to run the command on the current device, using wfx_exec")
-        #parser.add_argument("-S", "--settings", dest="cmd", action='append',            help="xxx")
-        #parser.add_argument("-O", "--state",    dest="cmd", action='append',    choices=['ON', 'OFF'],  help="PTA State ON or OFF xxx")
-        #parser.add_argument("-P", "--priority", dest="cmd", action='append', choices=['x', 'y'],    help="xxx")
         # Parser arguments: Mandatory
         parser.add_argument("command", action='store', metavar="command", choices=['STATE','PRIORITY','SETTINGS'], type=str.upper, help="Command among {STATE,PRIORITY,SETTINGS}") # ARGUMENT1 ,action="append", 
-        #parser.add_argument("value",   action='store', nargs='+') # ARGUMENT2 ,action="append", nargs=argparse.REMAINDER
         parser.add_argument("value",   action='store', type=str.upper, help="Value depending on the command")             # ARGUMENT3
-        #parser.add_argument("options", action='store', type=str.upper, nargs='*', help="optional arguments for the settings command: ...")  # ARGUMENT4... ,action="append", nargs=argparse.REMAINDER
         parser.add_argument("options", action='store', type=str, nargs=argparse.REMAINDER, help="Optional arguments for the settings command: ...")  # ARGUMENT4... ,action="append", nargs=argparse.REMAINDER
         # Apply Parser
-        ret_args = parser.parse_args(args) #, namespace=apta #.upper() #print(apta)
-        return ret_args #vars(ret_args)
+        ret_args = parser.parse_args(args) 
+        return ret_args 
 
       def main(argp):
         res2 = None
@@ -224,11 +215,8 @@ if __name__ == '__main__':
         status = 0  
         mode = argp["mode"] #argp.mode
         if mode == "VERBOSE": print("argp =",argp)
-        if DEBUG_FP: print("(2) mode =",mode)
         pta  = WfxPtaData(mode) #pta  = WfxPtaData() #
-        #cmd  = argp.cmd if argp.cmd else "" #"state"
         cmd  = argp["command"] if argp["command"] else "" 
-        if DEBUG_FP: print("(2) cmd  =",cmd)
         # You can define your simplification mapping here if there are mandatory+redundant arguments...
         if   cmd.upper() == "STATE":    header='state --State '
         elif cmd.upper() == "PRIORITY": header='priority --PriorityMode '
@@ -236,27 +224,15 @@ if __name__ == '__main__':
         else :                        header=''
         value   = argp["value"]   if argp["value"]   else "" # or "_" if we want the list of possible values 
         options = argp["options"] if argp["options"] else "" 
-        #args_text = header + ''.join(str(cmd)) # options #
-        args_text = header + ''.join(str(value)) #.join(str(options)) # options #
-        if DEBUG_FP: print("(2) header =",header)
-        if DEBUG_FP: print("(2) value =",value)
-        if DEBUG_FP: print("(2) options =",options)
-        #print(type(options))
-        #print((str(options)))
-        #print(''.join(str(options)))
+        args_text = header + ''.join(str(value)) 
         if options:
           args_opts = " ".join(options)
         else:
           args_opts = ""
         args_alls = (args_text + ' ' + args_opts).strip() # TODO: should equal args_text if not in command "settings"
-        if DEBUG_FP: print("(2) args_text =",args_text)
-        if DEBUG_FP: print("(2) args_opts =",args_opts)
-        if DEBUG_FP: print("(2) args_alls =",args_alls)
         if args_alls: pta.set_args(args_alls)
         # else: #TODO
         pta_data = pta.data()
-        #if DEBUG_FP: print("(2) output data bytes='%s'" % str(pta_data))
-        if DEBUG_FP: print("(2) args_alls =",args_alls)
         # Optional execution through HIF ("-x" option)
         exeh = argp["exeh"] 
         if exeh: 
@@ -275,11 +251,8 @@ if __name__ == '__main__':
             #res1  = send_result.returncode
             res2  = int(str(send_result.stdout.decode('ascii'))) #'utf-8'
             restxt = str(res2)
-            #if (mode == "VERBOSE"): print(restxt)
             if res2 < 0:
               print("Execution was terminated by signal", -res2, file=sys.stderr)
-            else:
-              pass #if (mode == "VERBOSE"): print("Execution returned", res2, file=sys.stderr)
           #except TimeoutExpired as e: #TODO
           except OSError as e:
               print("Execution failed:", e, file=sys.stderr)    
@@ -297,13 +270,10 @@ if __name__ == '__main__':
         else: 
             if (mode == "VERBOSE"): print("No signal sent.")
             print("Data = "+str(pta_data))      
-        return res2 #status #pta_data
+        return res2 
 
       if 1: #__name__ == '__main__':
         if sys.version_info < (3, 0):
             sys.stderr.write("This tools was developed for Python 3 and was not tested with Python 2.x\n")
-        #options = ' '.join(sys.argv[1:]) #parse_cmdline()
         argp = parse_cmdline_()
-        if DEBUG_FP: print("(1) options =", argp)
-        #sys.exit(main(options))
         sys.exit(main(vars(argp)))
