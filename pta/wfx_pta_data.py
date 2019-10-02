@@ -118,7 +118,7 @@ class WfxPtaData(object):
         self.g_settings = PtaSettings
         self.g_settings.pta_cmd = None # useless?
         self.sysargs = sys.argv[1:]
-        self.mode = mode if mode else 'quiet'
+        self.mode = mode.lower() if mode else 'quiet'
 
     def set_args(self, args=None):
         if args is not None:
@@ -127,7 +127,7 @@ class WfxPtaData(object):
             self.sysargs = []
 
     def print_if_verbose(self, txt, end=None):
-        if self.mode == 'verbose':
+        if self.mode.lower() == 'verbose':
             print(txt, end=end)
 
     def data(self):
@@ -155,13 +155,18 @@ class WfxPtaData(object):
                                          description="""
         Prepare and send PTA parameters depending on the selected pta_cmd
         """, epilog="""
-        Examples:
-        python wfx_pta_data.py settings --Config 3W_BLE
-        python wfx_pta_data.py settings --Config 3W_BLE --GrantValidTime 40
-        python wfx_pta_data.py settings --Config 3W_BLE --GrantValidTime 40 --PrioritySamplingTime 8
-        python wfx_pta_data.py priority --PriorityMode BALANCED
-        python wfx_pta_data.py state --State ON
-        python wfx_pta_data.py state --State OFF
+        Examples for wfx_pta_data (you may have to replace ./ by your Python3 path):
+        ./wfx_pta_data.py settings --Config 3W_BLE
+        ./wfx_pta_data.py settings --Config 3W_BLE --GrantValidTime 40
+        ./wfx_pta_data.py settings --Config 3W_BLE --GrantValidTime 40 --PrioritySamplingTime 8
+        ./wfx_pta_data.py priority --PriorityMode BALANCED
+        ./wfx_pta_data.py state --State ON
+        ./wfx_pta_data.py state --State OFF
+
+        Examples for wfx_pta (-x to execute, -v for verbose display):
+        ./wfx_pta.py priority BALANCED
+        ./wfx_pta.py -vx settings 3W_BLE
+        ./wfx_pta.py -x state ON
         """)
         parser.add_argument("pta_cmd", choices=['settings', 'priority', 'state'],
                             help="pta_cmd <settings/priority/state>")

@@ -185,12 +185,17 @@ if __name__ == '__main__':
         # Potential preprocessing of args  
 
         # Define parser
-        parser = argparse.ArgumentParser(description="""Generates a Bytes-frame that can be sent to HIF to configure PTA options. \r\n\
-          Optionally calls the wfx_exec(HIF) to send this stream on the current device.  \r\n\
-          Use cases: \r\n \
-           * %(prog)s state {ON,OFF}.                                                . \r\n \
-           * %(prog)s priority {COEX_MAXIMIZED,COEX_HIGH,BALANCED,WLAN_HIGH,WLAN_MAXIMIZED,0xYYYY} where YYYY is an hexa value.                 . \r\n \
-           * %(prog)s settings {3W_BLE,3W_NOT_COMBINED_ZIGBEE,3W_COMBINED_ZIGBEE} [options], w/ options described appending --help. """) 
+        parser = argparse.ArgumentParser(description="""
+    Generates a Bytes-frame that can be sent to HIF to configure PTA options. 
+    Optionally calls the wfx_exec(HIF) to send this stream on the current device. 
+    Use cases: 
+     * %(prog)s state {ON,OFF}. 
+     * %(prog)s priority {COEX_MAXIMIZED,COEX_HIGH,BALANCED,WLAN_HIGH,WLAN_MAXIMIZED,0xYYYY} where YYYY is an hexa value. 
+     * %(prog)s settings {3W_BLE,3W_NOT_COMBINED_ZIGBEE,3W_COMBINED_ZIGBEE} [options], w/ options described appending --help. """, 
+           epilog="""Examples:
+           ./wfx_pta.py priority BALANCED 
+           ./wfx_pta.py -vx settings 3W_BLE
+           ./wfx_pta.py -x state ON""" , formatter_class=argparse.RawDescriptionHelpFormatter) 
            #usage="%(prog)s [command [options]]"), prefix_chars='-', allow_abbrev=False
         # Parser arguments: Optional
         parser.add_argument('--version',       action='version',   version='%(prog)s {version}'.format(version=__version__))
@@ -258,8 +263,10 @@ if __name__ == '__main__':
               print("Sending the frame to the device (-x) ...")
           send_result = None #send_result = os.system(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"')
           try: # depending on versions of Python and Libs...
-            #send_result = subprocess.call(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"', shell=True, timeout=15) # or Popen(shlex.split(cmd...))
-            send_result = subprocess.run(r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"', shell=True, timeout=15, capture_output=True) # or Popen(shlex.split(cmd...))
+            my_cmd = r'wfx_exec wfx_hif_send_msg "' + pta_data + r'"'
+            #send_result = subprocess.call(my_cmd, shell=True, timeout=15) # or Popen(shlex.split(cmd...))
+            send_result = subprocess.run(my_cmd, shell=True, timeout=15, capture_output=True, check=True) #universal_newlines=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            # or Popen(shlex.split(cmd...))
             # TODO: Check there are no pb of returned value != displayed from wfx_exec 
             # TODO: ensure local exec OK + post-process the returned send_result... + try/catch exceptions
             #res1  = send_result.returncode
