@@ -25,7 +25,7 @@
 from __future__ import print_function
 
 # If you modify this file, please don't forget to increment version number.
-__version__ = "0.1.1"
+__version__ = "0.2.1"
 
 import sys
 import time
@@ -131,7 +131,10 @@ class WfxPtaTarget(object):
                 elif send_result == HI_ERROR_UNSUPPORTED_MSG_ID:
                     return 'HI_ERROR_UNSUPPORTED_MSG_ID'
                 else:
-                    return 'unknown_error_sending PTA data: ' + str(send_result) + ' (' + str(type(send_result)) + ')'
+                    if str(send_result) != "":
+                        return "ERROR: unknown_error_sending PTA data: '" + str(send_result) + "'" #+ " (" + str(type(send_result)) + ")"
+                    else:
+                        return "ERROR: unknown_error_sending PTA data"
         else:
             return "Error applying " + command + " '" + options + "'"
 
@@ -290,6 +293,7 @@ if __name__ == '__main__':
           if (mode == "VERBOSE") or (restxt != HI_STATUS_SUCCESS): 
               print("Sent = " + str(pta_data))
               print("Status = " + str(status))
+          else: print(str(status)) # optional?
         else: 
             if (mode == "VERBOSE"): print("No signal sent.")
             print("Data = "+str(pta_data))      
